@@ -289,11 +289,11 @@ avr_twi_write(
 						avr_twi_irq_msg(msgv, p->peer_addr, avr->data[p->r_twdr]));
 
 				if (do_read) { // read ?
-					_avr_twi_delay_state(p, 9,
+					_avr_twi_delay_state(p, 0,
 							msgv & TWI_COND_ACK ?
 									TWI_MRX_DATA_ACK : TWI_MRX_DATA_NACK);
 				} else {
-					_avr_twi_delay_state(p, 9,
+					_avr_twi_delay_state(p, 0,
 							p->state & TWI_COND_ACK ?
 									TWI_MTX_DATA_ACK : TWI_MTX_DATA_NACK);
 				}
@@ -319,7 +319,7 @@ avr_twi_write(
 
 			if (p->peer_addr & 1) { // read ?
 				p->state |= TWI_COND_READ;	// always allow read to start with
-				_avr_twi_delay_state(p, 9,
+				_avr_twi_delay_state(p, 0,
 						p->state & TWI_COND_ACK ?
 								TWI_MRX_ADR_ACK : TWI_MRX_ADR_NACK);
 			} else {
@@ -328,7 +328,7 @@ avr_twi_write(
 							p->state & TWI_COND_ACK ?
 									TWI_MTX_ADR_ACK : TWI_MTX_ADR_NACK);
 				}else{
-					_avr_twi_delay_state(p, 9,
+					_avr_twi_delay_state(p, 0,
 							p->state & TWI_COND_ACK ?
 									TWI_MTX_DATA_ACK : TWI_MTX_DATA_NACK);
 				}

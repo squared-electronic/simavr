@@ -1,5 +1,5 @@
 # 
-# 	Copyright 2008-2011 Michel Pollet <buserror@gmail.com>
+# 	Copyright 2008-2012 Michel Pollet <buserror@gmail.com>
 #
 #	This file is part of simavr.
 #
@@ -16,36 +16,34 @@
 #	You should have received a copy of the GNU General Public License
 #	along with simavr.  If not, see <http://www.gnu.org/licenses/>.
 
-target=	charlcd
+target=	i2ctest
 firm_src = ${wildcard at*${board}.c}
 firmware = ${firm_src:.c=.axf}
-simavr = ../../
+simavr = ../..
 
 IPATH = .
-IPATH += ../parts
+IPATH += ${simavr}/examples/shared
+IPATH += ${simavr}/examples/parts
 IPATH += ${simavr}/include
 IPATH += ${simavr}/simavr/sim
 
 VPATH = .
-VPATH += ../parts
+VPATH += ${simavr}/examples/shared
+VPATH += ${simavr}/examples/parts
 
-LDFLAGS += -lpthread
 
-include ../Makefile.opengl
-
-all: obj atmega48_charlcd.axf atmega48_fps_test.axf ${target} 
-
-atmega48_charlcd.axf: atmega48_charlcd.c
-atmega48_fps_test.axf: atmega48_fps_test.c
+all: obj ${firmware} ${target} 
 
 include ${simavr}/Makefile.common
 
+atmega1280_${target}.axf: atmega1280_${target}.c twimaster.c
+atmega1280_${target}.axf: ${simavr}/examples/shared/avr_twi_master.c
+atmega1280_${target}.axf: ${simavr}/examples/shared/avr_twi_master.h
+
 board = ${OBJ}/${target}.elf
 
-${board} : ${OBJ}/ac_input.o
-${board} : ${OBJ}/hd44780.o
-${board} : ${OBJ}/hd44780_glut.o
 ${board} : ${OBJ}/${target}.o
+${board} : ${OBJ}/i2c_eeprom.o
 
 ${target}: ${board}
 	@echo $@ done

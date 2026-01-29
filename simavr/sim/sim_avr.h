@@ -96,6 +96,13 @@ enum {
 #define AVR_TRACE(avr, ... ) \
 	AVR_LOG(avr, LOG_TRACE, __VA_ARGS__)
 
+/* The core's own IRQS. */
+
+enum {
+	AVR_CORE_BAD_OPCODE = 0,	// Execution of unknown instruction.
+	AVR_CORE_IRQ_COUNT,
+};
+
 /*
  * Core states.
  */
@@ -328,6 +335,10 @@ typedef struct avr_t {
 	// queue of io modules
 	struct avr_io_t * io_port;
 
+	// Core IRQs
+
+	avr_irq_t * irq;
+
 	// Builtin and user-defined commands
 	avr_cmd_table_t commands;
 	// cycle timers tracking & delivery
@@ -401,6 +412,21 @@ avr_core_allocate(
 void
 avr_reset(
 		avr_t * avr);
+
+// Get a pointer to a core IRQ.
+
+avr_irq_t *
+avr_get_core_irq(
+		avr_t * avr,
+		int     irq_no);
+
+/* Get a pointer to a memory IRQ. */
+
+avr_irq_t *avr_get_memory_irq(
+		avr_t   * avr,
+		uint16_t  addr,
+		int		  is16);
+
 // run one cycle of the AVR, sleep if necessary
 int
 avr_run(
@@ -502,6 +528,12 @@ avr_pending_sleep_usec(
 uint64_t
 avr_get_time_stamp(
 		avr_t * avr );
+
+/* This function returns a text string describing where in flash the AVR's
+ * PC is pointing.  It requires the CONFIG_SIMAVR_TRACE option.
+ */
+
+const char *avr_where(avr_t *avr);
 
 #ifdef __cplusplus
 };

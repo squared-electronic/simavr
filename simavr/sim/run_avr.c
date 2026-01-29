@@ -33,6 +33,15 @@
 
 #include "sim_core_decl.h"
 
+#ifndef NO_COLOR
+/* Replacements for ANSI escape codes if color is disabled. */
+static const struct text_colors font_no_color = {
+       .green  = "",
+       .red    = "",
+       .normal = ""
+};
+#endif
+
 static void
 display_usage(
 	const char * app)
@@ -50,13 +59,14 @@ display_usage(
 #ifdef CONFIG_SIMAVR_TRACE
 	 "       [--trace, -t]       Run full scale decoder trace\n"
 #else
-	 "       [--trace, -t]       Run full scale decoder trace (Off)\n"
+	 "       [--trace, -t]       Run full scale decoder trace (Disabled)\n"
 #endif //CONFIG_SIMAVR_TRACE
 	 "       [-ti <vector>]      Add traces for IRQ vector <vector>\n"
 	 "       [--input|-i <file>] A VCD file to use as input signals\n"
 	 "       [--output|-o <file>] A VCD file to save the traced signals\n"
 	 "       [--add-trace|-at    <name=[portpin|irq|trace]@addr/mask>] or \n"
-	 "                           <name=[sram8|sram16]@addr>]\n"
+	 "                           <name=[sram8|sram16]@addr>] or \n"
+	 "                           <name=ioirq@XXXX/N\n"
 	 "                           Add signal to be included in VCD output\n"
 	 "       [-ff <.hex file>]   Load next .hex file as flash\n"
 	 "       [-ee <.hex file>]   Load next .hex file as eeprom\n"
@@ -110,6 +120,12 @@ main(
 	int trace_vectors_count = 0;
 	const char *vcd_input = NULL;
 
+#ifndef NO_COLOR
+	const char *no_color = getenv("NO_COLOR");
+	if (no_color && no_color[0])
+		simavr_font = font_no_color;
+#endif
+
 	if (argc == 1)
 		display_usage(basename(argv[0]));
 
@@ -156,34 +172,59 @@ main(
 #endif //CONFIG_SIMAVR_TRACE
 		} else if (!strcmp(argv[pi], "-at") ||
 				   !strcmp(argv[pi], "--add-trace")) {
-			if (pi + 1 >= argc) {
-				fprintf(stderr, "%s: missing mandatory argument for %s.\n", argv[0], argv[pi]);
-				exit(1);
-			}
-			++pi;
 			struct {
 				char     kind[64];
 				uint8_t  mask;
-				uint16_t addr;
+				uint32_t addr;
 				char     name[64];
-			} trace;
-			const int n_args = sscanf(
-				argv[pi],
-				"%63[^=]=%63[^@]@0x%hx/0x%hhx",
-				&trace.name[0],
-				&trace.kind[0],
-				&trace.addr,
-				&trace.mask
-			);
+			}    trace;
+			char ioctl[4];
+			int  n_args, index, ok = 0;
 
-			if ((n_args != 4) &&
-				((n_args != 3) || (strcmp(trace.kind, "sram8") && strcmp(trace.kind, "sram16")))) {
+			if (pi + 1 >= argc) {
+				fprintf(stderr, "%s: missing mandatory argument for %s.\n",
+						argv[0], argv[pi]);
+				exit(1);
+			}
+			++pi;
+			n_args = sscanf(argv[pi], "%63[^=]=%63[^@]@0x%x/0x%hhx",
+						   trace.name, trace.kind, &trace.addr, &trace.mask);
+
+			switch (n_args) {
+			case 4:
+				if (strcmp(trace.kind, "ioirq"))
+					ok = 1;
+				break;
+			case 3:
+				if (!strcmp(trace.kind, "sram8") ||
+					!strcmp(trace.kind, "sram16")) {
+					ok = 1;
+				}
+				break;
+			case 2:
+				if (!strcmp(trace.kind, "ioirq") &&
+					sscanf(argv[pi], "%63[^=]=%63[^@]@%4c/%d",
+						   trace.name, trace.kind, ioctl, &index) == 4) {
+					trace.addr =
+						AVR_IOCTL_DEF(ioctl[0], ioctl[1], ioctl[2], ioctl[3]);
+					trace.mask = index;
+					ok = 1;
+				}
+				break;
+			default:
+				break;
+			}
+			if (!ok) {
 				--pi;
-				fprintf(stderr, "%s: format for %s is name=kind@addr</mask>.\n", argv[0], argv[pi]);
+				fprintf(stderr,
+						"%s: format for %s is name=kind@addr</mask>.\n",
+						argv[0], argv[pi]);
 				exit(1);
 			}
 
-			/****/ if (!strcmp(trace.kind, "portpin")) {
+			if (!strcmp(trace.kind, "ioirq")) {
+				f.trace[f.tracecount].kind = AVR_MMCU_TAG_VCD_IO_IRQ;
+			} else if (!strcmp(trace.kind, "portpin")) {
 				f.trace[f.tracecount].kind = AVR_MMCU_TAG_VCD_PORTPIN;
 			} else if (!strcmp(trace.kind, "irq")) {
 				f.trace[f.tracecount].kind = AVR_MMCU_TAG_VCD_IRQ;
@@ -208,7 +249,8 @@ main(
 
 			printf(
 				"Adding %s trace on address 0x%04x, mask 0x%02x ('%s')\n",
-				  f.trace[f.tracecount].kind == AVR_MMCU_TAG_VCD_PORTPIN ? "portpin"
+				f.trace[f.tracecount].kind == AVR_MMCU_TAG_VCD_IO_IRQ ? "ioirq"
+				: f.trace[f.tracecount].kind == AVR_MMCU_TAG_VCD_PORTPIN ? "portpin"
 				: f.trace[f.tracecount].kind == AVR_MMCU_TAG_VCD_IRQ     ? "irq"
 				: f.trace[f.tracecount].kind == AVR_MMCU_TAG_VCD_TRACE   ? "trace"
 				: f.trace[f.tracecount].kind == AVR_MMCU_TAG_VCD_SRAM_8  ? "sram8"
